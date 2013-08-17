@@ -108,13 +108,6 @@ var clipboard = Components.classes["@mozilla.org/widget/clipboardhelper;1"]
                                    .getService(Components.interfaces.nsIClipboardHelper);
 function categoryToSimple(cat) {
     switch(cat) {
-        case "XPConnect JavaScript":
-        case "component javascript":
-        case "chrome javascript":
-        case "DOM Worker javascript":
-        case "content javascript":
-        case "xbl javascript":
-            return "js";
         case "CSS Parser":
         case "CSS Loader":
             return "css";
@@ -123,24 +116,12 @@ function categoryToSimple(cat) {
         case "Invalid HSTS Headers":
         case "Insecure Password Field":
             return "security";
-        case "chrome registration":
         case "XBL":
         case "XBL Prototype Handler":
         case "XBL Content Sink":
-        case "FrameConstructor":
-        case "HUDConsole":
-        case "DOM Events":
-        case "DOM:HTML":
-        case "DOM Window":
-        case "SVG":
-        case "ImageMap":
-        case "HTML":
-        case "Canvas":
-        case "DOM3 Load":
-        case "DOM":
-        case "malformed-xml":
+        case "xbl javascript":
         default:
-            return "";
+            return "js";
     }
 }
 
@@ -427,7 +408,7 @@ li.strict .content:before { padding: 0em 0.1em 0.25em; content: "\26a0 "; font-s
         <menuitem label="Copy" onclick="ListBuilder.copy(event);"></menuitem>
     </menu>
     <div class="toolbar">
-        <button id="netbutton" onclick="ListBuilder.toggle('net');" class="toggle on">Net</button>
+        <!--<button id="netbutton" onclick="ListBuilder.toggle('net');" class="toggle on">Net</button>-->
         <button id="cssbutton" onclick="ListBuilder.toggle('css');" class="toggle on">CSS</button>
         <button id="jsbutton" onclick="ListBuilder.toggle('js');" class="toggle on">JS</button>
         <button id="secbutton" onclick="ListBuilder.toggle('sec');" class="toggle on">Sec</button>
