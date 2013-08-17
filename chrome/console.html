@@ -1,0 +1,443 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <script type="text/javascript">
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+/* Fake service
+function message(msg) {
+  this.message = msg;
+}
+function scriptError(opts) {
+    this.category = opts.category;
+    this.columnNumber = opts.columnNumber;
+    this.errorMessage = opts.msg;
+    this.flags = opts.flags;
+    this.innerWindowID = opts.windowId;
+    this.lineNumber = opts.lineNumber;
+    this.outerWindowID = opts.outerWindow;
+    this.sourceLine = opts.sourceLine;
+    this.sourceName = opts.sourceName;
+    this.timeStamp = opts.timestamp;
+}
+scriptError.prototype = {
+    get message() {
+        return this.errorMessage + " " + this.sourceName + ":" + this.sourceLine;
+    }
+}
+
+var nsIScriptError = {
+    errorFlag: 0x0,
+    warningFlag: 0x1,
+    exceptionFlag: 0x2,
+    strictFlag: 0x4
+}
+
+var consoleService = {
+    msgs: [
+        new scriptError({ category: "js", columnNumber: 1, msg: "The character encoding of the HTML document was not declared. The document will render with garbled text in some browser configurations if the document contains characters from outside the US-ASCII range. The character encoding of the page must be declared in the document or in the transfer protocol.", flags: 1, innerWindowIdD: 0,
+            lineNumber: 0, outerWindowID: 0, sourceLine: 35, sourceName: "console.html", timeStamp: Date.now() }),
+        new scriptError({ category: "net", msg: "GET https://developer.mozilla.org/en-US/docs/XPCOM_Interface_Reference/nsIScriptError#Categories [HTTP/1.1 200 OK 452ms]", innerWindowIdD: 0, timeStamp: Date.now() }),
+        new scriptError({ category: "css", columnNumber: 1, msg: "Script msg 3", flags: 2, innerWindowIdD: 0,
+                          lineNumber: 0, outerWindowID: 0, sourceLine: 35, sourceName: "console.html", timeStamp: Date.now() }),
+        new scriptError({ category: "js", columnNumber: 1, msg: "Script msg 4", flags: 4, innerWindowIdD: 0,
+                          lineNumber: 0, outerWindowID: 0, sourceLine: 35, sourceName: "console.html", timeStamp: Date.now() }),
+        new scriptError({ category: "js", columnNumber: 1, msg: "Script msg 5", flags: 6, innerWindowIdD: 0,
+                          lineNumber: 0, outerWindowID: 0, sourceLine: 35, sourceName: "console.html", timeStamp: Date.now() }),
+        new scriptError({ category: "css", msg: "Expected declaration but found '*'.  Skipped to next declaration.", sourceName: "ah-2011.css?20130713231534:273" }),
+        new message("Message 1"),
+        new message("Message 1"),
+        new message("Message 1"),
+        new message("Message 1"),
+        new message("Message 2"),
+        new message("Message 3"),
+        new message("Message 4"),
+        new message("Message 5"),
+        new message("Message 6"),
+        new message("Message 7"),
+        new message("Message 8"),
+    ],
+
+    listeners: [],
+
+    getMessageArray: function(count) {
+        count = this.msgs.length;
+        return this.msgs;
+    },
+
+    logMessage: function(message) {
+        this.msgs.push(message);
+        this.notifyListeners(message);
+    },
+
+    logStringMessage: function(msg) {
+        this.msgs.push();
+        this.notifyListeners(message);
+    },
+
+    registerListener: function(listener) {
+        this.listeners.push(listener);
+    },
+
+    reset: function() {
+        this.msgs = [];
+        this.notifyListeners();
+    },
+
+    unregisterListener: function(listener) {
+        var index = this.listeners.indexOf(listener);
+        this.listeners.slice(index, 1);
+    },
+
+    notifyListeners: function(msg) {
+        this.listeners.forEach(function(listener) {
+            listener.observe(msg);
+        });
+    }
+}
+*/
+/* real service */
+var consoleService = Components.classes["@mozilla.org/consoleservice;1"]
+                     .getService(Components.interfaces.nsIConsoleService);
+var ioService = Components.classes["@mozilla.org/network/io-service;1"]
+              .getService(Components.interfaces.nsIIOService);
+var wm = Components.classes["@mozilla.org/appshell/window-mediator;1"]
+        .getService(Components.interfaces.nsIWindowMediator);
+var clipboard = Components.classes["@mozilla.org/widget/clipboardhelper;1"]
+                                   .getService(Components.interfaces.nsIClipboardHelper);
+function categoryToSimple(cat) {
+    switch(cat) {
+        case "XPConnect JavaScript":
+        case "component javascript":
+        case "chrome javascript":
+        case "DOM Worker javascript":
+        case "content javascript":
+        case "xbl javascript":
+            return "js";
+        case "CSS Parser":
+        case "CSS Loader":
+            return "css";
+        case "Mixed Content Blocker":
+        case "CSP":
+        case "Invalid HSTS Headers":
+        case "Insecure Password Field":
+            return "security";
+        case "chrome registration":
+        case "XBL":
+        case "XBL Prototype Handler":
+        case "XBL Content Sink":
+        case "FrameConstructor":
+        case "HUDConsole":
+        case "DOM Events":
+        case "DOM:HTML":
+        case "DOM Window":
+        case "SVG":
+        case "ImageMap":
+        case "HTML":
+        case "Canvas":
+        case "DOM3 Load":
+        case "DOM":
+        case "malformed-xml":
+        default:
+            return "";
+    }
+}
+
+var ListBuilder = {
+    get list() {
+        delete this.list;
+        return this.list = document.getElementById("list");
+    },
+    showMsgs: function(msgs) {
+        msgs.forEach(function(msg) {
+            this.showMsg(msg);
+        }, this);
+    },
+
+    showMsg: function(msg) {
+        var li = document.createElement("li");
+        var content = document.createElement("span");
+        content.classList.add("content");
+        li.appendChild(content);
+
+        if (msg instanceof Ci.nsIScriptError) {
+            li.setAttribute("category", categoryToSimple(msg.category));
+            if (msg.flags & Ci.nsIScriptError.errorFlag) li.classList.add("error");
+            if (msg.flags & Ci.nsIScriptError.warningFlag) li.classList.add("warning");
+            if (msg.flags & Ci.nsIScriptError.exceptionFlag) li.classList.add("exception");
+            if (msg.flags & Ci.nsIScriptError.strictFlag) li.classList.add("strict");
+            content.textContent = msg.errorMessage;
+
+            if (msg.sourceName) {
+                var location = document.createElement("span");
+                location.classList.add("location");
+                var uri = ioService.newURI(msg.sourceName, null, null).path.split('/');
+                location.textContent = uri[uri.length-1];
+                if (msg.sourceLine)
+                    location.textContent += ":" + msg.sourceLine;
+                li.appendChild(location);
+                li.addEventListener("click", function() {
+                    window.open("view-source:" + msg.sourceName, "_blank");
+                });
+                li.setAttribute("role", "button");
+            } else if (msg.innerWindowID) {
+                var win = wm.getCurrentInnerWindowWithId(msg.innerWindowID);
+                if (!win)
+                    win = wm.getOuterWindowWithId(msg.outerWindowID);
+                if (win) {
+                    var uri = win.location.pathname.split('/');
+                    location.textContent = uri[uri.length-1];
+                    if (msg.sourceLine)
+                        location.textContent += ":" + msg.sourceLine;
+                    li.appendChild(location);
+                    li.addEventListener("click", function() {
+                        window.open("view-source:" + win.location.href, "_blank");
+                    });
+                    li.setAttribute("role", "button");
+                }
+            }
+
+            if (msg.timeStamp) {
+                var timestamp = document.createElement("span");
+                timestamp.classList.add("timestamp");
+                var d = new Date(msg.timeStamp ? msg.timeStamp : null);
+                var hours = d.getHours(), minutes = d.getMinutes();
+                var seconds = d.getSeconds(), milliseconds = d.getMilliseconds();
+                timestamp.textContent = hours + ":" + minutes + ":" + seconds + "." + milliseconds;
+                li.appendChild(timestamp);
+            }
+        } else {
+            content.textContent = msg.message;
+        }
+        this.list.appendChild(li);
+    },
+
+    startSearch: function() {
+        var toolbar = document.getElementsByClassName("toolbar")[0];
+        toolbar.classList.add("searching");
+        document.querySelector("input.search").focus();
+    },
+
+    endSearch: function() {
+        var toolbar = document.getElementsByClassName("toolbar")[0];
+        toolbar.classList.remove("searching");
+    },
+
+    toggle: function(type) {
+        // this probably needs to show a dialog letting you pick what levels to show hide?
+        document.getElementById(type + "button").classList.toggle("on");
+
+        var d = this.list.getAttribute("hiddentypes") || "";
+        if (d && d.contains(type))
+            d = d.replace(type + " ", "");
+        else
+            d += type + " ";
+
+        this.list.setAttribute("hiddentypes", d);
+    },
+
+    copy: function(event) {
+        var content = this.target.querySelector(".content");
+        clipboard.copyString(content.textContent);
+    },
+
+    observe: function(msg) {
+        if (!msg) {
+            this.clear();
+            return;
+        }
+        this.showMsg(msg);
+    },
+
+    clear: function() {
+        this.list.innerHTML = "";
+    },
+
+    doSearch: function(event) {
+        this.list.innerHTML = "";
+        var r = new RegExp(event.target.value, "i");
+        this.showMsgs(consoleService.getMessageArray().filter(function(msg) {
+            return r.test(msg.message);
+        }));
+    },
+
+    handleEvent: function(event) {
+        // store the target of context menu events so that we know which app to act on
+        this.target = event.target;
+        while (!this.target.hasAttribute("contextmenu")) {
+            this.target = this.target.parentNode;
+        }
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    ListBuilder.showMsgs(consoleService.getMessageArray());
+    consoleService.registerListener(ListBuilder);
+    document.addEventListener("contextmenu", ListBuilder, false);
+});
+    </script>
+    <style type="text/css">
+html, body {
+  padding: 0;
+  margin: 0;
+  min-height: 100%;
+  font-family: "Open Sans", sans-serif;
+  font-weight: 300;
+  background-color: #f1f1f1;
+  -moz-text-size-adjust: none;
+
+}
+.toolbar {
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  height: 3em;
+  width: 100%;
+  background-color: #dfe8ee;
+  background-image: linear-gradient(90deg, #dfe8ee, #ecf0f3);
+  color: black;
+  display: flex;
+  z-index: 999;
+}
+.toolbar > *.search { display: none; }
+.toolbar.searching > * { display: none; }
+.toolbar.searching > *.search { display: inline-block; }
+.toolbar > input {
+    border: none;
+    background-image: none;
+    border: none;
+    border-bottom: 1px solid gray;
+    flex: 1;
+    background-color: transparent;
+    padding: 0.5em;
+    font-size: 1rem;
+}
+.toolbar > input::-moz-placeholder { color: #555; font-variant: italic; }
+ul {
+  padding: 0;
+  margin: 0;
+  padding-top: 3em;
+  min-height: 110%;
+  list-style-image: none;
+  list-style-type: none;
+}
+li {
+  margin: 0;
+  padding: 0.5em 0.5em 1em;
+  min-height: 3em;
+  border-bottom: 1px solid lightgray;
+  border-left: 5px solid gray;
+  position: relative;
+}
+
+.toolbar button {
+    background: none;
+    display: inline-block;
+    border: none;
+    border-width: 0px;
+    padding: 0.75em;
+    margin: 0 ;
+    font-family: "Open Sans", sans-serif;
+    font-weight: 300;
+    font-size: 1rem;
+    border-right: 1px solid lightgray;
+    border-radius: 0;
+}
+
+button.toggle {
+    color: gray;
+    font-style: italic;
+}
+
+button.toggle.on,
+button.toggle.on + button.end {
+    background-color: rgba(255,255,255,0.1);
+    font-style: normal;
+    color: black;
+}
+
+.content {
+    display: block;
+    font-size: smaller;
+}
+
+button#netbutton { border-bottom: 5px solid rgba(0,0,0,0.25); }
+button#netbutton.on { border-bottom: 5px solid black; }
+li[category="net"] { border-left: 5px solid black; }
+li[category="net"] .content:before { color: black; }
+ul[hiddentypes~="net"] li[category="net"] { display: none; }
+
+button#cssbutton { border-bottom: 5px solid rgba(0,0,255,0.25); }
+button#cssbutton.on { border-bottom: 5px solid blue; }
+li[category="css"] { border-left: 5px solid blue; }
+li[category="css"] .content:before { color:  blue; }
+ul[hiddentypes~="css"] li[category="css"] { display: none; }
+
+button#jsbutton { border-bottom: 5px solid rgba(255,165,0,0.25); }
+button#jsbutton.on { border-bottom: 5px solid orange; }
+li[category="js"] .content:before { color:  orange; }
+li[category="js"] { border-left: 5px solid orange; }
+ul[hiddentypes~="js"] li[category="js"] { display: none; }
+
+button#secbutton { border-bottom: 5px solid rgba(255,0,0,0.25); }
+button#secbutton.on { border-bottom: 5px solid red; }
+li[category="security"] { border-left: 5px solid red; }
+li[category="security"] .content:before { color:  red; }
+ul[hiddentypes~="security"] li[category="security"] { display: none; }
+
+button#logbutton { border-bottom: 5px solid rgba(50,50,50,0.25); }
+button#logbutton.on { border-bottom: 5px solid gray; }
+ul[hiddentypes~="log"] li:not([category]),
+ul[hiddentypes~="log"] li[category=""] { display: none; }
+
+li.warning .content:before { padding: 0em 0.1em 0.25em; content: "x "; font-size: smaller; }
+li.error .content:before { padding: 0em 0.1em 0.25em; content: "\26a0 "; font-size: smaller; }
+li.exception .content:before { padding: 0em 0.1em 0.25em; content: "\26a0 "; font-size: smaller; }
+li.strict .content:before { padding: 0em 0.1em 0.25em; content: "\26a0 "; font-size: smaller; }
+
+.location {
+    position: absolute;
+    bottom: 0px;
+    right: 0px;
+    font-size: x-small;
+    padding: 0.25em;
+    color: #0088cc;
+
+    max-height: 1.5em;
+    overflow: hidden;
+    text-overflow: ellipsis clip;
+    white-space: nowrap;
+    width: calc(100% - 10em);
+    text-align: right;
+}
+
+.timestamp {
+    position: absolute;
+    bottom: 0px;
+    left: 0px;
+    font-size: x-small;
+    padding: 0.25em;
+    color: #666;
+}
+    </style>
+  </head>
+  <body>
+    <menu id="listmenu" type="context">
+        <menuitem label="Copy" onclick="ListBuilder.copy(event);"></menuitem>
+    </menu>
+    <div class="toolbar">
+        <button id="netbutton" onclick="ListBuilder.toggle('net');" class="toggle on">Net</button>
+        <button id="cssbutton" onclick="ListBuilder.toggle('css');" class="toggle on">CSS</button>
+        <button id="jsbutton" onclick="ListBuilder.toggle('js');" class="toggle on">JS</button>
+        <button id="secbutton" onclick="ListBuilder.toggle('sec');" class="toggle on">Sec</button>
+        <button id="logbutton" onclick="ListBuilder.toggle('log');" class="toggle on">Log</button>
+        <button id="clearbutton" onclick="consoleService.reset(); ListBuilder.clear();" class="">Clear</button>
+        <span style="flex: 1;"></span>
+        <button id="searchbutton" onclick="ListBuilder.startSearch()" class="">Filter</button>
+        <input class="search" type="search" placeholder="Filter" oninput="ListBuilder.doSearch(event);"></input>
+        <button class="search" onclick="ListBuilder.endSearch()">X</button>
+    </div>
+    <ul id="list" contextmenu="listmenu"></ul>
+  </body>
+</html>

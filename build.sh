@@ -112,18 +112,17 @@ if [ -f "chrome.manifest" ]; then
 
   OS=`uname`
   
-  if [ "$OS" == "Darwin" ]; then
+#  if [ "$OS" == "Darwin" ]; then
   	# OS X version of sed is not GNU... 
-  
-    sed -i '' -E 's@^(content[ ]+[^ ]*[ ]+)([^ ]*/)$@\1jar:chrome/'$APP_NAME'\.jar\!/\2@' chrome.manifest
-    sed -i '' -E 's@^(skin|locale)([ ]+[^ ]*[ ]+[^ ]*[ ]+)(.*/)$@\1\2jar:chrome/'$APP_NAME'\.jar\!/\3@' chrome.manifest
-      
-  else
 
-    sed -i -r s/^\(content\\s+\\S*\\s+\)\(\\S*\\/\)$/\\1jar:chrome\\/$APP_NAME\\.jar!\\/\\2/ chrome.manifest
-    sed -i -r s/^\(skin\|locale\)\(\\s+\\S*\\s+\\S*\\s+\)\(.*\\/\)$/\\1\\2jar:chrome\\/$APP_NAME\\.jar!\\/\\3/ chrome.manifest
+#    sed -i '' -E 's@^(content[ ]+[^ ]*[ ]+)([^ ]*/)$@\1jar:chrome/'$APP_NAME'\.jar\!/\2@' chrome.manifest
+#    sed -i '' -E 's@^(skin|locale)([ ]+[^ ]*[ ]+[^ ]*[ ]+)(.*/)$@\1\2jar:chrome/'$APP_NAME'\.jar\!/\3@' chrome.manifest
+#  else
 
-  fi
+#    sed -i -r s/^\(content\\s+\\S*\\s+\)\(\\S*\\/\)$/\\1jar:chrome\\/$APP_NAME\\.jar!\\/\\2/ chrome.manifest
+#    sed -i -r s/^\(skin\|locale\)\(\\s+\\S*\\s+\\S*\\s+\)\(.*\\/\)$/\\1\\2jar:chrome\\/$APP_NAME\\.jar!\\/\\3/ chrome.manifest
+
+#  fi
 
 fi
 

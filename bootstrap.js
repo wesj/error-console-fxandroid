@@ -3,67 +3,81 @@ const Ci = Components.interfaces;
 const Cu = Components.utils;
 
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-function isNativeUI() {
-  return (Services.appinfo.ID == "{aa3c5121-dab2-40e2-81ca-7ea25febc110}");
+// Dynamically generates a classID for our component, registers it to mask
+// the existing component, and stored the masked components classID to be
+// restored later, when we unregister.
+function registerTemporaryComponent(comp)
+{
+  let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
+  if (!comp.prototype.classID) {
+    let uuidgen = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
+    comp.prototype.classID = uuidgen.generateUUID();
+  }
+  // comp.prototype.maskedClassID = Components.ID(Cc[comp.prototype.contractID].number);
+  if (!comp.prototype.factory)
+    comp.prototype.factory = getFactory(comp);
+  registrar.registerFactory(comp.prototype.classID, "", comp.prototype.contractID, comp.prototype.factory);
 }
 
-function showToast(aWindow) {
-  aWindow.NativeWindow.toast.show("Showing you a toast", "short");
+function unregisterTemporaryComponent(comp)
+{
+  let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
+  registrar.unregisterFactory(comp.prototype.classID, comp.prototype.factory);
+  // registrar.registerFactory(comp.prototype.maskedClassID, "", comp.prototype.contractID, null);
 }
 
-function showDoorhanger(aWindow) {
-  buttons = [
-    {
-      label: "Button 1",
-      callback: function() {
-        aWindow.NativeWindow.toast.show("Button 1 was tapped", "short");
-      }
-    } , {
-      label: "Button 2",
-      callback: function() {
-        aWindow.NativeWindow.toast.show("Button 2 was tapped", "short");
-      }
-    }];
-
-  aWindow.NativeWindow.doorhanger.show("Showing a doorhanger with two button choices.", "doorhanger-test", buttons);
+// Stolen from XPCOMUtils, since this handy function is not public there
+function getFactory(comp) {
+  return {
+    createInstance: function (outer, iid) {
+      if (outer)
+        throw Cr.NS_ERROR_NO_AGGREGATION;
+      return (new comp()).QueryInterface(iid);
+    }
+  }
 }
 
-function copyLink(aWindow, aTarget) {
-  let url = aWindow.NativeWindow.contextmenus._getLinkURL(aTarget);
-  aWindow.NativeWindow.toast.show("Todo: copy > " + url, "short");
+function AboutConsoleHandler() { }
+AboutConsoleHandler.prototype = {
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIAboutModule]),
+  contractID: "@mozilla.org/network/protocol/about;1?what=console",
+
+  newChannel: function(aURI) {
+    var channel = Services.io.newChannel("chrome://console/content/console.html", null, null);
+    channel.originalURI = aURI;
+    return channel;
+  },
+
+  getURIFlags: function(aURI) {
+    return Ci.nsIAboutModule.ALLOW_SCRIPT;
+  }
 }
 
-var gToastMenuId = null;
-var gDoorhangerMenuId = null;
-var gContextMenuId = null;
-
+var menuid;
 function loadIntoWindow(window) {
   if (!window)
     return;
 
-  if (isNativeUI()) {
-    gToastMenuId = window.NativeWindow.menu.add("Show Toast", null, function() { showToast(window); });
-    gDoorhangerMenuId = window.NativeWindow.menu.add("Show Doorhanger", null, function() { showDoorhanger(window); });
-    gContextMenuId = window.NativeWindow.contextmenus.add("Copy Link", window.NativeWindow.contextmenus.linkOpenableContext, function(aTarget) { copyLink(window, aTarget); });
-  }
+  menuid = window.NativeWindow.menu.add({
+    name: "Console",
+    parent: window.NativeWindow.menu.toolsMenuID,
+    icon: "",
+    callback: function() {
+        window.BrowserApp.addTab("about:console", { });
+    }
+  });
 }
 
 function unloadFromWindow(window) {
   if (!window)
     return;
 
-  if (isNativeUI()) {
-    window.NativeWindow.menu.remove(gToastMenuId);
-    window.NativeWindow.menu.remove(gDoorhangerMenuId);
-    window.NativeWindow.contextmenus.remove(gContextMenuId);
-  }
+  if (menuid)
+    window.NativeWindow.menu.remove(menuid);
 }
 
-
-/**
- * bootstrap.js API
- */
 var windowListener = {
   onOpenWindow: function(aWindow) {
     // Wait for the window to finish loading
@@ -91,6 +105,7 @@ function startup(aData, aReason) {
 
   // Load into any new windows
   Services.wm.addListener(windowListener);
+  registerTemporaryComponent(AboutConsoleHandler);
 }
 
 function shutdown(aData, aReason) {
@@ -108,6 +123,7 @@ function shutdown(aData, aReason) {
     let domWindow = windows.getNext().QueryInterface(Ci.nsIDOMWindow);
     unloadFromWindow(domWindow);
   }
+  unregisterTemporaryComponent(AboutConsoleHandler);
 }
 
 function install(aData, aReason) {
